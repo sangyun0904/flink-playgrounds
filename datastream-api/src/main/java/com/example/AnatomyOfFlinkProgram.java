@@ -14,6 +14,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.util.Collector;
 
+import java.time.Duration;
 import java.util.Random;
 
 public class AnatomyOfFlinkProgram {
@@ -21,7 +22,7 @@ public class AnatomyOfFlinkProgram {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        String[] words = {"Hello", "World", "Apache", "Flink", "Spark", "Spring", "Boot"};
+        String[] words = {"Hello", "World", "Flink", "Apache", "Spring", "Kafka", "Spark", "Superset"};
 
         GeneratorFunction<Long, String> generatorFunction = index -> "Number: " + words[new Random().nextInt(words.length)];
         long numberOfRecords = 1000;
@@ -29,19 +30,21 @@ public class AnatomyOfFlinkProgram {
         DataGeneratorSource<String> source =
                 new DataGeneratorSource<>(generatorFunction, numberOfRecords, RateLimiterStrategy.perSecond(17), Types.STRING);
 
-//        DataStreamSource<String> stream =
-//                env.fromSource(source,
-//                        WatermarkStrategy.noWatermarks(),
-//                        "Generator Source");
-//
-//        stream.print();
+        DataStreamSource<String> stream =
+                env.fromSource(source,
+                        WatermarkStrategy.noWatermarks(),
+                        "Generator Source");
+
+
 
         DataStream<Tuple2<String, Integer>> dataStream = env
+                .setParallelism(17)
                 .fromSource(source, WatermarkStrategy.noWatermarks(), "Generator Source")
                 .flatMap(new Splitter())
                 .keyBy(value -> value.f0)
-                .window(TumblingProcessingTimeWindows.of(Time.seconds(5).toDuration()))
+                .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                 .sum(1);
+
 
         dataStream.print();
 
